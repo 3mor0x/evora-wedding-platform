@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  font-family: 'Alexandria', system-ui, -apple-system, sans-serif;
+  direction: rtl;
+}
+
+body {
+  background-color: #FAFAF9;
+  color: #0F172A;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
