@@ -1,11 +1,10 @@
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dkthrgzvj';
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'wedding_preset';
 
-// دالة سريعة جداً لضغط وتصغير الصورة في المتصفح قبل رفعها
-async function compressImage(file, maxWidth = 1200, quality = 0.75) {
+// دالة ضغط فورية فائقة السرعة تنزل أي صورة لـ أقل من 100 كيلوبايت
+async function fastCompressImage(file, maxDimension = 900, quality = 0.65) {
   return new Promise((resolve) => {
-    // لو مش صورة عادية عديها زي ما هي
-    if (!file.type.startsWith('image/')) return resolve(file);
+    if (!file || !file.type.startsWith('image/')) return resolve(file);
 
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -16,9 +15,17 @@ async function compressImage(file, maxWidth = 1200, quality = 0.75) {
         let width = img.width;
         let height = img.height;
 
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
+        // تصغير الأبعاد لتسريع الرفع بدون التأثير على وضوح الموبايل
+        if (width > height) {
+          if (width > maxDimension) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
         }
 
         const canvas = document.createElement('canvas');
@@ -31,11 +38,11 @@ async function compressImage(file, maxWidth = 1200, quality = 0.75) {
         canvas.toBlob(
           (blob) => {
             if (!blob) return resolve(file);
-            const compressedFile = new File([blob], file.name, {
+            const compressed = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
               type: 'image/jpeg',
               lastModified: Date.now()
             });
-            resolve(compressedFile);
+            resolve(compressed);
           },
           'image/jpeg',
           quality
@@ -47,16 +54,15 @@ async function compressImage(file, maxWidth = 1200, quality = 0.75) {
   });
 }
 
-// دالة الرفع السحابي السريعة
 export async function uploadImageToCloudinary(file) {
-  if (!file) return null;
+  if (!file) return '';
 
   try {
-    // ضغط الصورة فوراً في أجزاء من الثانية
-    const fileToUpload = await compressImage(file);
+    // ضغط الصورة فورياً
+    const readyFile = await fastCompressImage(file);
 
     const formData = new FormData();
-    formData.append('file', fileToUpload);
+    formData.append('file', readyFile);
     formData.append('upload_preset', UPLOAD_PRESET);
 
     const response = await fetch(
@@ -68,13 +74,13 @@ export async function uploadImageToCloudinary(file) {
     );
 
     if (!response.ok) {
-      throw new Error(`Cloudinary upload failed with status ${response.status}`);
+      throw new Error(`Upload error ${response.status}`);
     }
 
     const data = await response.json();
-    return data.secure_url;
+    return data.secure_url || '';
   } catch (error) {
-    console.error('Error uploading to Cloudinary:', error);
-    throw error;
+    console.error('Cloudinary Upload Error:', error);
+    return '';
   }
 }

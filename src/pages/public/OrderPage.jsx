@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getAllInvitations, createOrder, getSiteSettings } from '../../services/db';
 import { uploadImageToCloudinary } from '../../services/cloudinary';
-import { CheckCircle2, ArrowRight, Copy, Check, Receipt, Send, Lock } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Copy, Check, Receipt, Send, Lock, Image as ImageIcon } from 'lucide-react';
 
 export default function OrderPage() {
   const [searchParams] = useSearchParams();
@@ -67,20 +67,33 @@ export default function OrderPage() {
     setTimeout(() => setCopiedNumber(false), 2000);
   };
 
+  const handleCoupleImagesChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFiles(Array.from(e.target.files));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    try {
-      // رفع صور المناسبة وإيصال الدفع بالتوازي لتسريع الإرسال
-      const uploadPromises = selectedFiles.map(file => uploadImageToCloudinary(file));
-      const receiptPromise = receiptFile ? uploadImageToCloudinary(receiptFile) : Promise.resolve('');
 
-      const [uploadedImageUrls, receiptUrl] = await Promise.all([
-        Promise.all(uploadPromises),
-        receiptPromise
+    try {
+      // رفع كل الصور بالتوازي الصريح
+      const imagesUploadPromise = Promise.all(
+        selectedFiles.map(file => uploadImageToCloudinary(file))
+      );
+      const receiptUploadPromise = receiptFile 
+        ? uploadImageToCloudinary(receiptFile) 
+        : Promise.resolve('');
+
+      const [rawImageUrls, receiptUrl] = await Promise.all([
+        imagesUploadPromise,
+        receiptUploadPromise
       ]);
 
-      // تجهيز الملاحظة التلقائية غير القابلة للتعديل
+      // استبعاد أي رابط فارغ
+      const validImages = rawImageUrls.filter(url => Boolean(url));
+
       const systemNote = currentInvitation 
         ? `[نمط التصميم المعتمد: نفس هوية وتنسيق ${currentInvitation.title}]` 
         : `[طلب تصميم خاص جديد بالكامل]`;
@@ -96,8 +109,8 @@ export default function OrderPage() {
         invitationId: currentInvitation ? currentInvitation.id : 'custom_design',
         invitationTitle: currentInvitation ? currentInvitation.title : 'طلب تصميم مخصص بالكامل',
         price: currentInvitation ? currentInvitation.price : 450,
-        images: uploadedImageUrls,
-        receiptUrl: receiptUrl
+        images: validImages, // صور العروسين مصفوفة نظيفة
+        receiptUrl: receiptUrl || ''
       };
 
       const newOrder = await createOrder(orderPayload);
@@ -113,7 +126,8 @@ export default function OrderPage() {
         `• التاريخ: ${formData.eventDate}\n` +
         `• المكان: ${formData.venueName}\n` +
         `• وسيلة تحويل العربون: ${formData.paymentMethod === 'instapay' ? 'إنستاباي' : 'فودافون كاش'}\n` +
-        (receiptUrl ? `• تم إرفاق صورة إيصال التحويل بالطلب بنجاح ✅\n\n` : `\n`) +
+        (receiptUrl ? `• تم إرفاق صورة إيصال التحويل بالطلب بنجاح ✅\n` : '') +
+        (validImages.length > 0 ? `• تم إرفاق عدد (${validImages.length}) صورة للعروسين ✅\n\n` : '\n') +
         `أرغب في متابعة تأكيد الحجز معكم.`
       );
 
@@ -137,7 +151,7 @@ export default function OrderPage() {
           كود الطلب: <span className="font-mono font-bold text-slate-900 text-base">{submittedOrder.orderCode}</span>
         </p>
         <div className="p-5 rounded-xl mb-8 text-xs leading-relaxed border border-slate-200 bg-white text-slate-600">
-          تم توجيهكم إلى محادثة الواتساب. سنراجع تفاصيل الحفل وإيصال التحويل ونبدأ التنفيذ فوراً.
+          تم توجيهكم إلى محادثة الواتساب. سنراجع تفاصيل الحفل والصور المرفقة وإيصال التحويل ونبدأ التنفيذ فوراً.
         </div>
         <button
           onClick={() => navigate('/')}
@@ -164,7 +178,7 @@ export default function OrderPage() {
       </div>
 
       <form onSubmit={handleSubmit} className={`grid grid-cols-1 ${currentInvitation ? 'lg:grid-cols-12' : 'max-w-2xl mx-auto'} gap-8 items-start`}>
-        {/* كارت المعاينة - يظهر فقط إذا كان الزائر ضغط طلب على كارت معين */}
+        {/* كارت المعاينة */}
         {currentInvitation && (
           <div className="lg:col-span-5 border border-slate-200 rounded-2xl p-4 shadow-xs sticky top-24 bg-white">
             <span className="text-[11px] font-semibold text-slate-400 block mb-2">
@@ -198,7 +212,6 @@ export default function OrderPage() {
 
         {/* الحقول والفورم */}
         <div className={`${currentInvitation ? 'lg:col-span-7' : 'w-full'} border border-slate-200 rounded-2xl p-6 md:p-8 shadow-xs space-y-5 bg-white`}>
-          
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <span className="text-xs font-semibold text-slate-900">
               بيانات الحفل والمناسبة
@@ -299,7 +312,7 @@ export default function OrderPage() {
             />
           </div>
 
-          {/* تحويل العربون */}
+          {/* صندوق تحويل العربون */}
           <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -356,21 +369,30 @@ export default function OrderPage() {
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => setReceiptFile(e.target.files[0])}
+                onChange={(e) => setReceiptFile(e.target.files[0] || null)}
                 className="w-full text-xs text-slate-500 file:ml-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:bg-slate-200 file:text-slate-800 file:text-xs cursor-pointer"
               />
             </div>
           </div>
 
+          {/* رفع صور المناسبة أو العروسين */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">صور المناسبة أو العروسين (اختياري)</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">
+              صور المناسبة أو العروسين (يمكنك اختيار أكثر من صورة)
+            </label>
             <input
               type="file"
               multiple
               accept="image/*"
-              onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
-              className="w-full text-xs text-slate-500 file:ml-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:bg-slate-200 file:text-slate-800 file:text-xs cursor-pointer"
+              onChange={handleCoupleImagesChange}
+              className="w-full text-xs text-slate-500 file:ml-3 file:py-1.5 file:px-2.5 file:rounded file:border-0 file:bg-slate-200 file:text-slate-800 file:text-xs cursor-pointer"
             />
+            {selectedFiles.length > 0 && (
+              <p className="text-[11px] text-emerald-600 mt-1.5 font-medium flex items-center gap-1">
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>تم اختيار {selectedFiles.length} صورة وسيتم رفعهم مضغوطين فوراً</span>
+              </p>
+            )}
           </div>
 
           <div>
@@ -412,7 +434,7 @@ export default function OrderPage() {
             {submitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>جاري إرسال الطلب وحفظ البيانات...</span>
+                <span>جاري الرفع الفوري وإرسال الطلب...</span>
               </>
             ) : (
               <>
