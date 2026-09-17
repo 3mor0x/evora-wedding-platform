@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getAllInvitations, createOrder, getSiteSettings } from '../../services/db';
 import { uploadImageToCloudinary } from '../../services/cloudinary';
+import { sendTelegramNotification } from '../../services/notifications';
 import { CheckCircle2, ArrowRight, Copy, Check, Receipt, Send, Lock, Image as ImageIcon } from 'lucide-react';
 
 export default function OrderPage() {
@@ -78,7 +79,7 @@ export default function OrderPage() {
     setSubmitting(true);
 
     try {
-      // رفع كل الصور بالتوازي الصريح
+      // رفع صور العروسين وإيصال الدفع بالتوازي الصريح
       const imagesUploadPromise = Promise.all(
         selectedFiles.map(file => uploadImageToCloudinary(file))
       );
@@ -91,9 +92,9 @@ export default function OrderPage() {
         receiptUploadPromise
       ]);
 
-      // استبعاد أي رابط فارغ
       const validImages = rawImageUrls.filter(url => Boolean(url));
 
+      // تجهيز الملاحظة التلقائية غير القابلة للتعديل
       const systemNote = currentInvitation 
         ? `[نمط التصميم المعتمد: نفس هوية وتنسيق ${currentInvitation.title}]` 
         : `[طلب تصميم خاص جديد بالكامل]`;
@@ -109,14 +110,17 @@ export default function OrderPage() {
         invitationId: currentInvitation ? currentInvitation.id : 'custom_design',
         invitationTitle: currentInvitation ? currentInvitation.title : 'طلب تصميم مخصص بالكامل',
         price: currentInvitation ? currentInvitation.price : 450,
-        images: validImages, // صور العروسين مصفوفة نظيفة
+        images: validImages,
         receiptUrl: receiptUrl || ''
       };
 
       const newOrder = await createOrder(orderPayload);
       setSubmittedOrder(newOrder);
 
-      // رسالة الواتساب الجاهزة
+      // إرسال إشعار فوري لتليجرام للمسؤول
+      sendTelegramNotification(newOrder);
+
+      // توجيه العميل إلى الواتساب
       const whatsappMsg = encodeURIComponent(
         `مرحباً إيفورا | Evora 💍\n\n` +
         `• كود الطلب: ${newOrder.orderCode}\n` +
@@ -151,7 +155,7 @@ export default function OrderPage() {
           كود الطلب: <span className="font-mono font-bold text-slate-900 text-base">{submittedOrder.orderCode}</span>
         </p>
         <div className="p-5 rounded-xl mb-8 text-xs leading-relaxed border border-slate-200 bg-white text-slate-600">
-          تم توجيهكم إلى محادثة الواتساب. سنراجع تفاصيل الحفل والصور المرفقة وإيصال التحويل ونبدأ التنفيذ فوراً.
+          تم توجيهكم إلى محادثة الواتساب، كما تم إخطار فريق العمل فوراً للبدء في تجهيز الدعوة.
         </div>
         <button
           onClick={() => navigate('/')}
@@ -312,7 +316,7 @@ export default function OrderPage() {
             />
           </div>
 
-          {/* صندوق تحويل العربون */}
+          {/* تحويل العربون */}
           <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -390,7 +394,7 @@ export default function OrderPage() {
             {selectedFiles.length > 0 && (
               <p className="text-[11px] text-emerald-600 mt-1.5 font-medium flex items-center gap-1">
                 <ImageIcon className="w-3.5 h-3.5" />
-                <span>تم اختيار {selectedFiles.length} صورة وسيتم رفعهم مضغوطين فوراً</span>
+                <span>تم اختيار {selectedFiles.length} صورة وسيتم رفعهم فوراً</span>
               </p>
             )}
           </div>
