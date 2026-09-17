@@ -51,7 +51,7 @@ export default function OrderPage() {
           setPaymentSettings(prev => ({ ...prev, ...settingsData }));
         }
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching data on order page:', err);
       }
     }
     init();
@@ -71,19 +71,16 @@ export default function OrderPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      let uploadedImageUrls = [];
-      if (selectedFiles.length > 0) {
-        uploadedImageUrls = await Promise.all(
-          selectedFiles.map(file => uploadImageToCloudinary(file))
-        );
-      }
+      // رفع صور المناسبة وإيصال الدفع بالتوازي لتسريع الإرسال
+      const uploadPromises = selectedFiles.map(file => uploadImageToCloudinary(file));
+      const receiptPromise = receiptFile ? uploadImageToCloudinary(receiptFile) : Promise.resolve('');
 
-      let receiptUrl = '';
-      if (receiptFile) {
-        receiptUrl = await uploadImageToCloudinary(receiptFile);
-      }
+      const [uploadedImageUrls, receiptUrl] = await Promise.all([
+        Promise.all(uploadPromises),
+        receiptPromise
+      ]);
 
-      // الملاحظة المثبتة تلقائياً
+      // تجهيز الملاحظة التلقائية غير القابلة للتعديل
       const systemNote = currentInvitation 
         ? `[نمط التصميم المعتمد: نفس هوية وتنسيق ${currentInvitation.title}]` 
         : `[طلب تصميم خاص جديد بالكامل]`;
@@ -106,10 +103,11 @@ export default function OrderPage() {
       const newOrder = await createOrder(orderPayload);
       setSubmittedOrder(newOrder);
 
+      // رسالة الواتساب الجاهزة
       const whatsappMsg = encodeURIComponent(
         `مرحباً إيفورا | Evora 💍\n\n` +
         `• كود الطلب: ${newOrder.orderCode}\n` +
-        `• النموذج المختار: ${currentInvitation ? currentInvitation.title : 'تصميم مخصص خاص'}\n` +
+        `• نوع الطلب: ${currentInvitation ? currentInvitation.title : 'تصميم مخصص خاص'}\n` +
         (currentInvitation ? `• ملاحظة النمط: نفس هوية وتنسيق (${currentInvitation.title})\n` : '') +
         `• العروسين: ${formData.groomName} و ${formData.brideName}\n` +
         `• التاريخ: ${formData.eventDate}\n` +
@@ -121,7 +119,7 @@ export default function OrderPage() {
 
       window.open(`https://wa.me/2${paymentSettings.whatsapp}?text=${whatsappMsg}`, '_blank');
     } catch (err) {
-      console.error(err);
+      console.error('Submit order error:', err);
       alert('حدث خطأ أثناء إرسال الطلب، يرجى المحاولة ثانية.');
     } finally {
       setSubmitting(false);
@@ -166,7 +164,7 @@ export default function OrderPage() {
       </div>
 
       <form onSubmit={handleSubmit} className={`grid grid-cols-1 ${currentInvitation ? 'lg:grid-cols-12' : 'max-w-2xl mx-auto'} gap-8 items-start`}>
-        {/* كارت المعاينة (يظهر فقط إذا كان جاي من كارت معين) */}
+        {/* كارت المعاينة - يظهر فقط إذا كان الزائر ضغط طلب على كارت معين */}
         {currentInvitation && (
           <div className="lg:col-span-5 border border-slate-200 rounded-2xl p-4 shadow-xs sticky top-24 bg-white">
             <span className="text-[11px] font-semibold text-slate-400 block mb-2">
@@ -201,7 +199,6 @@ export default function OrderPage() {
         {/* الحقول والفورم */}
         <div className={`${currentInvitation ? 'lg:col-span-7' : 'w-full'} border border-slate-200 rounded-2xl p-6 md:p-8 shadow-xs space-y-5 bg-white`}>
           
-          {/* بادج نظيف جداً في رأس الفورم */}
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <span className="text-xs font-semibold text-slate-900">
               بيانات الحفل والمناسبة
@@ -302,7 +299,7 @@ export default function OrderPage() {
             />
           </div>
 
-          {/* صندوق تحويل العربون */}
+          {/* تحويل العربون */}
           <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -388,7 +385,7 @@ export default function OrderPage() {
             />
           </div>
 
-          {/* الملاحظة المثبتة غير القابلة للتعديل عند العميل */}
+          {/* الملاحظة المثبتة غير القابلة للتعديل */}
           <div className="p-3 rounded-xl border border-slate-200/90 bg-slate-100/70 text-slate-600 text-xs flex items-start gap-2.5">
             <Lock className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
             <div className="leading-relaxed">
