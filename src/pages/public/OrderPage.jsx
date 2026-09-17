@@ -94,7 +94,7 @@ export default function OrderPage() {
 
       const validImages = rawImageUrls.filter(url => Boolean(url));
 
-      // تجهيز الملاحظة التلقائية غير القابلة للتعديل
+      // الملاحظة المثبتة
       const systemNote = currentInvitation 
         ? `[نمط التصميم المعتمد: نفس هوية وتنسيق ${currentInvitation.title}]` 
         : `[طلب تصميم خاص جديد بالكامل]`;
@@ -115,27 +115,12 @@ export default function OrderPage() {
       };
 
       const newOrder = await createOrder(orderPayload);
-      setSubmittedOrder(newOrder);
 
-      // إرسال إشعار فوري لتليجرام للمسؤول
+      // إرسال الإشعار الفوري إلى تليجرام
       sendTelegramNotification(newOrder);
 
-      // توجيه العميل إلى الواتساب
-      const whatsappMsg = encodeURIComponent(
-        `مرحباً إيفورا | Evora 💍\n\n` +
-        `• كود الطلب: ${newOrder.orderCode}\n` +
-        `• نوع الطلب: ${currentInvitation ? currentInvitation.title : 'تصميم مخصص خاص'}\n` +
-        (currentInvitation ? `• ملاحظة النمط: نفس هوية وتنسيق (${currentInvitation.title})\n` : '') +
-        `• العروسين: ${formData.groomName} و ${formData.brideName}\n` +
-        `• التاريخ: ${formData.eventDate}\n` +
-        `• المكان: ${formData.venueName}\n` +
-        `• وسيلة تحويل العربون: ${formData.paymentMethod === 'instapay' ? 'إنستاباي' : 'فودافون كاش'}\n` +
-        (receiptUrl ? `• تم إرفاق صورة إيصال التحويل بالطلب بنجاح ✅\n` : '') +
-        (validImages.length > 0 ? `• تم إرفاق عدد (${validImages.length}) صورة للعروسين ✅\n\n` : '\n') +
-        `أرغب في متابعة تأكيد الحجز معكم.`
-      );
-
-      window.open(`https://wa.me/2${paymentSettings.whatsapp}?text=${whatsappMsg}`, '_blank');
+      // إظهار شاشة النجاح مباشرة بدون فتح واتساب
+      setSubmittedOrder(newOrder);
     } catch (err) {
       console.error('Submit order error:', err);
       alert('حدث خطأ أثناء إرسال الطلب، يرجى المحاولة ثانية.');
@@ -151,11 +136,11 @@ export default function OrderPage() {
           <CheckCircle2 className="w-8 h-8" />
         </div>
         <h2 className="text-2xl font-bold mb-2 text-slate-900">تم تسجيل طلبكم بنجاح في إيفورا</h2>
-        <p className="text-slate-500 text-sm mb-6">
+        <p className="text-slate-500 text-sm mb-4">
           كود الطلب: <span className="font-mono font-bold text-slate-900 text-base">{submittedOrder.orderCode}</span>
         </p>
         <div className="p-5 rounded-xl mb-8 text-xs leading-relaxed border border-slate-200 bg-white text-slate-600">
-          تم توجيهكم إلى محادثة الواتساب، كما تم إخطار فريق العمل فوراً للبدء في تجهيز الدعوة.
+          تم استلام تفاصيل الحفل والمرفقات بنجاح، وسيتواصل معكم فريق العمل لتأكيد التجهيز وبدء التنفيذ.
         </div>
         <button
           onClick={() => navigate('/')}
@@ -443,7 +428,7 @@ export default function OrderPage() {
             ) : (
               <>
                 <Send className="w-3.5 h-3.5" />
-                <span>إرسال الطلب وتأكيد الحجز عبر واتساب</span>
+                <span>إرسال وتأكيد الطلب</span>
               </>
             )}
           </button>
